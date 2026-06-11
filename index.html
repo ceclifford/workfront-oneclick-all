@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workfront One-Click Project Creator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 40px 44px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .logo-badge {
+      background: #76b900;
+      color: white;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .logo-text {
+      font-size: 14px;
+      color: #888;
+      font-weight: 500;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #1a1a1a;
+      transition: border-color 0.15s;
+      margin-bottom: 20px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #76b900;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      background: #76b900;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      margin-top: 4px;
+    }
+
+    button:hover { background: #689e00; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .result {
+      display: none;
+      margin-top: 24px;
+      padding: 18px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .result.success {
+      background: #f0f9e0;
+      border: 1.5px solid #76b900;
+      color: #2a4a00;
+    }
+
+    .result.error {
+      background: #fff0f0;
+      border: 1.5px solid #e53935;
+      color: #7a0000;
+    }
+
+    .result a {
+      color: #76b900;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .result a:hover { text-decoration: underline; }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <span class="logo-badge">NVIDIA</span>
+      <span class="logo-text">Workfront</span>
+    </div>
+
+    <h1>Create a New Project</h1>
+    <p class="subtitle">Fill in the details below and click Create — that's it!</p>
+
+    <form id="form">
+      <label for="name">Project Name</label>
+      <input id="name" type="text" placeholder="e.g. Q3 Campaign Launch" required />
+
+      <label for="due_date">Due Date</label>
+      <input id="due_date" type="date" required />
+
+      <label for="requestor">Requestor Name</label>
+      <input id="requestor" type="text" placeholder="e.g. Sandra Froehlich" required />
+
+      <label for="owner">Project Owner Name</label>
+      <input id="owner" type="text" placeholder="e.g. Colleen Clifford" required />
+
+      <button type="submit" id="btn">Create Project</button>
+    </form>
+
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    // ── IMPORTANT: Replace this URL after deploying your Cloudflare Worker ──
+    const WORKER_URL = "https://workfront-oneclick.colleenc.workers.dev";
+    // ────────────────────────────────────────────────────────────────────────
+
+    const form     = document.getElementById("form");
+    const btn      = document.getElementById("btn");
+    const resultEl = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name      = document.getElementById("name").value.trim();
+      const due_date  = document.getElementById("due_date").value;
+      const requestor = document.getElementById("requestor").value.trim();
+      const owner     = document.getElementById("owner").value.trim();
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Creating project…';
+      resultEl.style.display = "none";
+
+      try {
+        const res = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, due_date, requestor, owner }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          resultEl.className = "result success";
+          resultEl.innerHTML = `
+            ✅ <strong>Project created!</strong><br><br>
+            <strong>Name:</strong> ${data.name}<br>
+            <strong>Due:</strong> ${data.due_date}<br>
+            <strong>Requestor:</strong> ${data.requestor}<br>
+            ${data.owner ? `<strong>Owner:</strong> ${data.owner}<br>` : ""}
+            <strong>Status:</strong> ${data.status}<br><br>
+            <a href="${data.url}" target="_blank">Open in Workfront →</a>
+          `;
+          form.reset();
+        } else {
+          resultEl.className = "result error";
+          resultEl.innerHTML = `❌ <strong>Error:</strong> ${data.error}`;
+        }
+      } catch (err) {
+        resultEl.className = "result error";
+        resultEl.innerHTML = `❌ <strong>Could not connect.</strong> Please check your internet connection and try again.`;
+      }
+
+      resultEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Create Project";
+    });
+  </script>
+</body>
+</html>
